@@ -2,7 +2,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from database.database import DataBase
 
-bot = Bot('5226167292:AAFHzB21VU8zGOQ3SKQBke2gyfJNwdtEkIs', parse_mode='HTML')
+bot = Bot('', parse_mode='HTML')
 
 db = DataBase()
 
