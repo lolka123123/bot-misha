@@ -1,1 +1,1 @@
-from .antiflood import AntiFloodMiddleware
+from . import middlewares

