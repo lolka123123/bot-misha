@@ -6,13 +6,12 @@ from data.loader import bot, dp, db
 import time
 import random
 from states.states import states
-from data.translate import get_translate
+from data.translate import get_translate, get_profile_to_premium_text, get_profile_without_premium_text
 import asyncio
 
 
 
 async def auto_searching():
-
     while True:
         in_searching = db.get_users_from_searching_after_seconds(int(time.time()))
         count = len(in_searching)
@@ -50,10 +49,55 @@ async def auto_searching():
             user1_data = await user1_state.get_data()
             user2_data = await user2_state.get_data()
 
-            await bot.edit_message_text(get_translate(user1_lang, 'main_chatting_is_found_text'), chat_id=user1,
+            user1_profile = db.get_user_to_profile(user1)
+            user2_profile = db.get_user_to_profile(user2)
+
+
+
+            await bot.edit_message_text(text=get_translate(user1_lang, 'main_chatting_is_found_text'),
+                                        chat_id=user1,
                                         message_id=user1_data['message_id'])
-            await bot.edit_message_text(get_translate(user2_lang, 'main_chatting_is_found_text'), chat_id=user2,
+            await bot.edit_message_text(text=get_translate(user2_lang, 'main_chatting_is_found_text'),
+                                        chat_id=user2,
                                         message_id=user2_data['message_id'])
+
+            if db.get_premium(user1):
+                await bot.send_message(chat_id=user1, text=get_profile_to_premium_text(lang=user1_lang,
+                                                                                       likes=user2_profile[0],
+                                                                                       dislikes=user2_profile[1],
+                                                                                       rating=user2_profile[2],
+                                                                                       country=user2_profile[4],
+                                                                                       gender=user2_profile[3],
+                                                                                       age=user2_profile[6],
+                                                                                       interests=user2_profile[7],
+                                                                                       language=user2_profile[5]))
+            else:
+                await bot.send_message(chat_id=user1, text=get_profile_without_premium_text(lang=user1_lang,
+                                                                                            likes=user2_profile[0],
+                                                                                            dislikes=user2_profile[1],
+                                                                                            rating=user2_profile[2]))
+            if db.get_premium(user2):
+                msg = await bot.send_message(chat_id=user2, text=get_profile_to_premium_text(lang=user2_lang,
+                                                                                             likes=user1_profile[0],
+                                                                                             dislikes=user1_profile[1],
+                                                                                             rating=user1_profile[2],
+                                                                                             country=user1_profile[4],
+                                                                                             gender=user1_profile[3],
+                                                                                             age=user1_profile[6],
+                                                                                             interests=user1_profile[7],
+                                                                                             language=user1_profile[5]))
+            else:
+                msg = await bot.send_message(chat_id=user2, text=get_profile_without_premium_text(lang=user2_lang,
+                                                                                                  likes=user1_profile[0],
+                                                                                                  dislikes=user1_profile[1],
+                                                                                                  rating=user1_profile[2]))
+
+            await user1_state.update_data(message=msg, sent_messages=0, sent_photos=0, sent_videos=0,
+                                          sent_videos_note=0, sent_stickers=0, sent_voices=0, sent_audios=0,
+                                          sent_document=0, time_spent_in_chatting=0)
+            await user2_state.update_data(message=msg, sent_messages=0, sent_photos=0, sent_videos=0,
+                                          sent_videos_note=0, sent_stickers=0, sent_voices=0, sent_audios=0,
+                                          sent_document=0, time_spent_in_chatting=0)
 
         else:
             await asyncio.sleep(5)

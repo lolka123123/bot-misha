@@ -40,3 +40,13 @@ class ChangeUsernameMiddleware(BaseMiddleware):
             if user[1] != event.from_user.username:
                 db.change_username_by_telegram_id(event.from_user.username)
         return await handler(event, data)
+
+class PremiumMiddleware(BaseMiddleware):
+    async def __call__(self,
+                       handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
+                       event: Message,
+                       data: Dict[str, Any]) -> Any:
+        user = db.get_overdue_premium(event.from_user.id, event.date.timestamp())
+        if user:
+            db.remove_premium(event.from_user.id)
+        return await handler(event, data)

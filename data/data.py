@@ -1,0 +1,3 @@
+COUNTRIES = ['uzbekistan']
+
+INTERESTS = ['communication']

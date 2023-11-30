@@ -7,6 +7,9 @@ from data.translate import get_translate
 from states.states import states
 from handlers.users.text_handlers import show_main_menu
 
+from keyboards.reply import reply_keyboard
+from keyboards.inline import inline_keyboard
+
 from time import sleep
 
 router = Router()
@@ -24,6 +27,38 @@ async def main_searching_delete_message(call: CallbackQuery, state: FSMContext):
         await show_main_menu(call.message, state)
     else:
         await call.message.delete()
+
+@router.callback_query(F.data == 'close_message')
+async def close_message(call: CallbackQuery, state: FSMContext):
+    await call.message.delete()
+
+@router.callback_query(F.data == 'settings')
+async def profile_message(call: CallbackQuery, state: FSMContext):
+    await call.message.delete()
+    lang = db.get_user(call.message.chat.id)[3]
+    got_state = await state.get_state()
+    if got_state != states.MainStates.searching and got_state != states.MainStates.chatting:
+        await state.set_state(states.MainMenu.settings_menu)
+        await call.message.answer(get_translate(lang, 'menu_settings_button'),
+                                  reply_markup=reply_keyboard.settings_menu(lang))
+
+@router.callback_query(F.data.startswith('like'))
+async def like_user(call: CallbackQuery, state: FSMContext):
+    lang = db.get_user(call.message.chat.id)[3]
+    chat_id = int(call.data.split('_')[1])
+
+    db.change_user_stats(chat_id, likes=1, rating=1)
+
+    await call.message.edit_text(get_translate(lang, 'main_chatting_liked_text'))
+
+@router.callback_query(F.data.startswith('dislike'))
+async def dislike_user(call: CallbackQuery, state: FSMContext):
+    lang = db.get_user(call.message.chat.id)[3]
+    chat_id = int(call.data.split('_')[1])
+
+    db.change_user_stats(chat_id, dislikes=1, rating=-1)
+
+    await call.message.edit_text(get_translate(lang, 'main_chatting_liked_text'))
 
 
 # from handlers.users.text_handlers import show_main_menu

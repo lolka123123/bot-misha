@@ -12,17 +12,24 @@ from aiogram.filters import Command, CommandObject
 
 from states.states import states
 from keyboards.reply import reply_keyboard
+from keyboards.inline import inline_keyboard
 from data.translate import get_translate
 from data.config import show_time, check_time
-from filters.is_admin import IsAdmin
+from filters.filters import IsAdmin, CommandStartFilter
 
+from handlers.users.text_handlers import working, show_main_menu
+from asyncdef.auto_searching import auto_searching
 
 import datetime
 
 # router = Router()
 
+def stop_chatting_message_text(lang, time):
+    return f"""{get_translate(lang, 'main_chatting_finished_text')}
+{get_translate(lang, 'main_chatting_time_text')} {show_time(time)}
+"""
 
-async def stop_chatting_def(user1, user2):
+async def stop_chatting_def(user1, user2, message):
     db.remove_user_from_chatting(user1)
     db.remove_user_from_chatting(user2)
 
@@ -34,14 +41,39 @@ async def stop_chatting_def(user1, user2):
     user2_state: FSMContext = FSMContext(storage=dp.storage,
                                          key=StorageKey(chat_id=user2, user_id=user2, bot_id=bot.id))
 
+    user1_data = await user1_state.get_data()
+    user2_data = await user2_state.get_data()
+
+    db.change_user_stats(telegram_id=user1, sent_messages=user1_data['sent_messages'],
+                         sent_photos=user1_data['sent_photos'], sent_videos=user1_data['sent_videos'],
+                         sent_videos_note=user1_data['sent_videos_note'], sent_stickers=user1_data['sent_stickers'],
+                         sent_voices=user1_data['sent_voices'], sent_audios=user1_data['sent_audios'],
+                         sent_document=user1_data['sent_document'],
+                         time_spent_in_chatting=message.date.timestamp() - user1_data['message'].date.timestamp())
+    db.change_user_stats(telegram_id=user2, sent_messages=user2_data['sent_messages'],
+                         sent_photos=user2_data['sent_photos'], sent_videos=user2_data['sent_videos'],
+                         sent_videos_note=user2_data['sent_videos_note'], sent_stickers=user2_data['sent_stickers'],
+                         sent_voices=user2_data['sent_voices'], sent_audios=user2_data['sent_audios'],
+                         sent_document=user2_data['sent_document'],
+                         time_spent_in_chatting=message.date.timestamp() - user2_data['message'].date.timestamp())
+
     await user1_state.clear()
     await user2_state.clear()
 
     await user1_state.set_state(states.MainMenu.main_menu)
     await user2_state.set_state(states.MainMenu.main_menu)
 
-    await bot.send_message(chat_id=user1, text=get_translate(user1_lang, 'main_chatting_finished_text'))
-    await bot.send_message(chat_id=user2, text=get_translate(user2_lang, 'main_chatting_finished_text'))
+    await bot.send_message(chat_id=user1,
+                           text=stop_chatting_message_text(user1_lang,
+                                                           message.date.timestamp() - user1_data['message'].date.timestamp()))
+    await bot.send_message(chat_id=user2,
+                           text=stop_chatting_message_text(user2_lang,
+                                                           message.date.timestamp() - user2_data['message'].date.timestamp()))
+
+    await bot.send_message(chat_id=user1, text=get_translate(user1_lang, 'main_chatting_likes_text'),
+                           reply_markup=inline_keyboard.likes(user2))
+    await bot.send_message(chat_id=user2, text=get_translate(user2_lang, 'main_chatting_likes_text'),
+                           reply_markup=inline_keyboard.likes(user1))
 
     await bot.send_message(chat_id=user1, text=get_translate(user1_lang, 'menu_show_text'),
                            reply_markup=reply_keyboard.main_menu(user1_lang))
@@ -58,7 +90,7 @@ async def stop_chatting(message: Message, state: FSMContext):
     if another_user == message.from_user.id:
         another_user = chat[2]
 
-    await stop_chatting_def(message.from_user.id, another_user)
+    await stop_chatting_def(message.from_user.id, another_user, message)
 
 
 @dp.message(Command('check'), IsAdmin(), states.MainStates.chatting)
@@ -68,7 +100,7 @@ async def check_chat(message: Message, state:FSMContext):
     chat = data['chat']
     timestamp = datetime.datetime.fromtimestamp(message.date.timestamp())
     time = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-    await message.answer(f'<b>chat_id:</b> {chat[0]}\n<b>first_user_id:</b> {chat[1]}\n<b>second_user_id:</b> {chat[2]}\n<b>time:</b> {time}')
+    await message.answer(f'<b>chat_id:</b> {chat[0]}\n<b>first_user_id:</b> {db.get_user(chat[1])}\n<b>second_user_id:</b> {db.get_user(chat[2])}\n<b>time:</b> {time}')
 
 @dp.message(Command('ban'), IsAdmin())
 async def command_ban(message: Message, state: FSMContext, command: CommandObject):
@@ -187,33 +219,15 @@ async def command_unban(message: Message, state: FSMContext, command: CommandObj
 
 
 
+@dp.message(Command('start'), CommandStartFilter())
+async def command_start(message: Message, state: FSMContext):
+    if working[0] == False:
+        working[0] = True
+        await auto_searching()
+    if db.get_user(message.chat.id):
+        await show_main_menu(message, state)
+    else:
+        await state.set_state(states.RegistrationState.choose_language)
+        await message.answer('Выберите язык:\nChoose language:',
+                             reply_markup=reply_keyboard.choose_language())
 
-
-#
-#     elif message.text.split(' ')[0] == '/unban':
-#         lang = db.get_user(message.chat.id)[3]
-#         chat_id = message.chat.id
-#         if not db.get_admin(chat_id):
-#             await message.answer(get_translate(lang, 'admin_no_access'))
-#         else:
-#             command = message.text.split(' ')[1:]
-#
-#             if command == list():
-#                 await message.answer('/unban <b>(username)</b>')
-#             else:
-#                 username = command[0][1:]
-#                 user = db.get_user_by_username(username)
-#
-#                 if not user:
-#                     await message.answer('Пользователь не найден')
-#                 else:
-#                     if not db.get_banned_user(user[0]):
-#                         await message.answer('Пользователь не находится в блокировке')
-#                     else:
-#                         db.remove_ban_user(user[0])
-#                         await message.answer(f'@{user[1]} разблокирован!')
-#                         await message.answer(f'Вы были разблокированы!')
-#
-#     else:
-#         await message.answer('Такой команды не существует')
-#

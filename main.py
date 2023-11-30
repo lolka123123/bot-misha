@@ -14,12 +14,16 @@ import handlers
 from asyncdef.auto_searching import auto_searching
 
 db.create_users_table()
+db.create_users_stats_table()
 db.create_admin_table()
 db.create_ban_table()
 db.create_in_searching_table()
 db.create_in_chatting_table()
 db.create_chats_table()
 db.create_chat_messages_table()
+db.create_premium_table()
+
+db.create_test()
 
 
 
@@ -36,6 +40,7 @@ async def main():
     db.remove_all_users_from_chatting()
     dp.message.middleware(BannedUserMiddleware())
     dp.message.middleware(ChangeUsernameMiddleware())
+    dp.message.middleware(PremiumMiddleware())
 
 
 
