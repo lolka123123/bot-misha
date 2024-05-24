@@ -4,7 +4,11 @@ from database.database import DataBase
 from data.config import TELEGRAM_TOKEN
 
 
+
 bot = Bot(TELEGRAM_TOKEN, parse_mode='HTML')
+
+bot = Bot('TOKEN', parse_mode='HTML')
+
 
 db = DataBase()
 
