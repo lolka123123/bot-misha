@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from data.loader import bot, dp, db
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
@@ -10,7 +12,10 @@ from handlers.users.text_handlers import show_main_menu
 from keyboards.reply import reply_keyboard
 from keyboards.inline import inline_keyboard
 
+
 from time import sleep
+
+import requests
 
 router = Router()
 
@@ -59,6 +64,8 @@ async def dislike_user(call: CallbackQuery, state: FSMContext):
     db.change_user_stats(chat_id, dislikes=1, rating=-1)
 
     await call.message.edit_text(get_translate(lang, 'main_chatting_liked_text'))
+
+
 
 
 # from handlers.users.text_handlers import show_main_menu

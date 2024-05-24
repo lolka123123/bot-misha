@@ -3,6 +3,9 @@ LANGUAGES = {
         'language': 'Русский',
 
         'admin_no_access': '<b>У вас нет доступа к этой комманде</b>',
+        'try_later': 'Попробуйте позже',
+        'product_not_exist': 'Товара не существует',
+        'product_not_paid': 'Товар не оплачен',
 
         'registration_choose_language': '📕 Выберите язык:',
         'registration_choose_country_text': '🌍 Укажите страну:',
@@ -110,8 +113,8 @@ LANGUAGES = {
 }
 
 
-from data.data import COUNTRIES, INTERESTS
-from data.config import show_time
+from data.categories import COUNTRIES, INTERESTS
+from data.functions import show_time
 from datetime import datetime
 
 def get_translate(lang, text):
@@ -283,3 +286,4 @@ def get_profile_without_premium_text(lang, likes, dislikes, rating):
 <b>{get_translate(lang, 'profile_likes')}</b> (👍{likes}/👎{dislikes})
 <b>{get_translate(lang, 'profile_rating')}</b> {rating}
 """
+

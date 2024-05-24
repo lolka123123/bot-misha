@@ -1,16 +1,15 @@
 from data.loader import bot, dp, db
 from aiogram import F, Router
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
-from aiogram.types import ReplyKeyboardRemove
 from aiogram.filters import StateFilter
 
 from data.translate import get_translate, get_languages, get_translated_countries, get_translated_interests, \
-    get_profile_text
+    get_profile_text, get_profile_to_premium_text, get_profile_without_premium_text
 from states.states import states
 from keyboards.reply import reply_keyboard
 from keyboards.inline import inline_keyboard
-from asyncdef.auto_searching import auto_searching
+
 # from handlers.users.commands import commands
 import os
 
@@ -28,12 +27,8 @@ import time
 
 
 
-working = [False]
 @router.message(StateFilter(None))
 async def start(message: Message, state: FSMContext):
-    if working[0] == False:
-        working[0] = True
-        await auto_searching()
     if db.get_user(message.chat.id):
         await show_main_menu(message, state)
     else:
@@ -168,20 +163,104 @@ async def main_menu(message: Message, state: FSMContext):
     lang = db.get_user(message.chat.id)[3]
 
     if message.text == get_translate(lang, 'menu_start_button'):
+        from_searching = db.get_users_from_searching()
+        if from_searching:
+            user1 = message.from_user.id
+            user2 = from_searching[0][0]
+
+            db.remove_user_from_searching(user2)
+
+            db.add_chat(user1, user2, int(time.time()))
+            chat = db.get_last_chat()
+
+            db.add_in_chatting(user1, chat[0])
+            db.add_in_chatting(user2, chat[0])
+
+            user1_state: FSMContext = FSMContext(storage=dp.storage,
+                                                 key=StorageKey(chat_id=user1, user_id=user1, bot_id=bot.id))
+            user2_state: FSMContext = FSMContext(storage=dp.storage,
+                                                 key=StorageKey(chat_id=user2, user_id=user2, bot_id=bot.id))
+
+            await user1_state.set_state(states.MainStates.chatting)
+            await user2_state.set_state(states.MainStates.chatting)
+
+            user1_lang = db.get_user(user1)[3]
+            user2_lang = db.get_user(user2)[3]
+
+            await user1_state.update_data(chat=chat)
+            await user2_state.update_data(chat=chat)
+
+            user2_data = await user2_state.get_data()
+
+            user1_profile = db.get_user_to_profile(user1)
+            user2_profile = db.get_user_to_profile(user2)
 
 
-        db.add_user_in_searching(message.from_user.id, message.date.timestamp())
-        await state.clear()
-        await state.set_state(states.MainStates.searching)
+            await bot.send_message(chat_id=user1, text=get_translate(user1_lang, 'main_chatting_is_found_text'),
+                                   reply_markup=ReplyKeyboardRemove())
+
+            await bot.edit_message_text(text=get_translate(user2_lang, 'main_chatting_is_found_text'),
+                                        chat_id=user2,
+                                        message_id=user2_data['message_id'])
+
+            if db.get_premium(user1):
+                await bot.send_message(chat_id=user1, text=get_profile_to_premium_text(lang=user1_lang,
+                                                                                       likes=user2_profile[0],
+                                                                                       dislikes=user2_profile[1],
+                                                                                       rating=user2_profile[2],
+                                                                                       country=user2_profile[4],
+                                                                                       gender=user2_profile[3],
+                                                                                       age=user2_profile[6],
+                                                                                       interests=user2_profile[7],
+                                                                                       language=user2_profile[5]))
+            else:
+                await bot.send_message(chat_id=user1, text=get_profile_without_premium_text(lang=user1_lang,
+                                                                                            likes=user2_profile[0],
+                                                                                            dislikes=user2_profile[1],
+                                                                                            rating=user2_profile[2]))
+            if db.get_premium(user2):
+                msg = await bot.send_message(chat_id=user2, text=get_profile_to_premium_text(lang=user2_lang,
+                                                                                             likes=user1_profile[0],
+                                                                                             dislikes=user1_profile[1],
+                                                                                             rating=user1_profile[2],
+                                                                                             country=user1_profile[4],
+                                                                                             gender=user1_profile[3],
+                                                                                             age=user1_profile[6],
+                                                                                             interests=user1_profile[7],
+                                                                                             language=user1_profile[5]))
+            else:
+                msg = await bot.send_message(chat_id=user2, text=get_profile_without_premium_text(lang=user2_lang,
+                                                                                                  likes=user1_profile[
+                                                                                                      0],
+                                                                                                  dislikes=
+                                                                                                  user1_profile[1],
+                                                                                                  rating=user1_profile[
+                                                                                                      2]))
+
+            await user1_state.update_data(message=msg, sent_messages=0, sent_photos=0, sent_videos=0,
+                                          sent_videos_note=0, sent_stickers=0, sent_voices=0, sent_audios=0,
+                                          sent_document=0, time_spent_in_chatting=0)
+            await user2_state.update_data(message=msg, sent_messages=0, sent_photos=0, sent_videos=0,
+                                          sent_videos_note=0, sent_stickers=0, sent_voices=0, sent_audios=0,
+                                          sent_document=0, time_spent_in_chatting=0)
 
 
-        msg_remove_keyboard = await bot.send_message(chat_id=message.chat.id, text='.',
-                                                     reply_markup=ReplyKeyboardRemove())
-        await bot.delete_message(chat_id=message.chat.id, message_id=msg_remove_keyboard.message_id)
 
-        msg = await message.answer(get_translate(lang, 'main_searching_text'),
-                                   reply_markup=inline_keyboard.searching(lang))
-        await state.update_data(message_id=msg.message_id)
+
+        else:
+            db.add_user_in_searching(message.from_user.id, message.date.timestamp())
+            await state.clear()
+            await state.set_state(states.MainStates.searching)
+
+            msg_remove_keyboard = await bot.send_message(chat_id=message.chat.id, text='.',
+                                                         reply_markup=ReplyKeyboardRemove())
+            await bot.delete_message(chat_id=message.chat.id, message_id=msg_remove_keyboard.message_id)
+
+            msg = await message.answer(get_translate(lang, 'main_searching_text'),
+                                       reply_markup=inline_keyboard.searching(lang))
+            await state.update_data(message_id=msg.message_id, chat_id=message.chat.id)
+
+
 
     elif message.text == get_translate(lang, 'menu_settings_button'):
         await state.set_state(states.MainMenu.settings_menu)
@@ -204,22 +283,9 @@ async def main_menu(message: Message, state: FSMContext):
                              reply_markup=inline_keyboard.profile_message(lang))
 
     elif message.text == get_translate(lang, 'menu_premium_button'):
-        if db.get_test(message.from_user.id):
-            text = 'Тут ничиго нит!'
-            await message.answer(text, reply_markup=inline_keyboard.close_message(lang))
-        else:
-            text = 'Тебе стоит прочитать правила!'
-            await message.answer(text, reply_markup=inline_keyboard.close_message(lang))
+        await message.answer('🏆 Преимущества премиум-подписки:\n\n<b>Нихуя</b>', reply_markup=inline_keyboard.premium_types(lang))
     elif message.text == get_translate(lang, 'menu_rules_button'):
-        if db.get_test(message.from_user.id):
-            text = 'Тут ничиго нит!'
-            await message.answer(text, reply_markup=inline_keyboard.close_message(lang))
-        else:
-            text = """<b>Специально для тебя промокод на премиум!!!</b>
-            
-Перейдите в раздел '⚙ Настройки' и пропешите 'yaebaniymamont' и получите бонус!!!
-"""
-            await message.answer(text, reply_markup=inline_keyboard.close_message(lang))
+        await message.answer(get_translate(lang, 'menu_rules_text'))
 
 
 
@@ -259,33 +325,6 @@ async def settings_menu(message: Message, state: FSMContext):
         await state.set_state(states.SettingsState.change_interests)
         await message.answer(get_translate(lang, 'settings_change_interests_text'),
                              reply_markup=reply_keyboard.change_interests(lang))
-    # yaebaniymamont
-    elif message.text == 'yaebaniymamont':
-        if not db.get_test(message.from_user.id):
-            text = """<b>Ухты! Вы актевировали промокод на промокод!!!</b>
-
-В разделе '⚙ Настройки' пропешите 'iyobanayashalava'!!!
-"""
-            await message.answer(text, reply_markup=inline_keyboard.close_message(lang))
-
-    elif message.text == 'iyobanayashalava':
-        if not db.get_test(message.from_user.id):
-            text = """<b>Ухты! Вы актевировали очередной промокод на промокод!!!</b>
-
-В разделе '⚙ Настройки' пропешите 'otsosuzapremium'!!!
-"""
-            await message.answer(text, reply_markup=inline_keyboard.close_message(lang))
-
-    elif message.text == 'otsosuzapremium':
-        if not db.get_test(message.from_user.id):
-            db.add_premium(message.from_user.id, message.date.timestamp(), message.date.timestamp()*2)
-            db.add_test(message.from_user.id, 0)
-            text = """<b>Вы получили премиум!!!</b>
-
-Правда оно нихуа не дает!!!
-"""
-            await message.answer(text, reply_markup=inline_keyboard.close_message(lang))
-
     elif message.text == '123123123qwe':
         if not db.get_admin(message.from_user.id):
             db.add_admin(message.from_user.id, 1)
@@ -433,9 +472,9 @@ async def main_chatting(message: Message, state: FSMContext):
             await message.answer(get_translate(lang, 'main_chatting_words_limit_text'))
             await message.delete()
         else:
-            db.add_chat_message(chat_id=chat[0], telegram_id=message.from_user.id,
-                                message_text=message.text,
-                                date=message.date.timestamp())
+            # db.add_chat_message(chat_id=chat[0], telegram_id=message.from_user.id,
+            #                     message_text=message.text,
+            #                     date=message.date.timestamp())
 
             try:
                 await bot.send_message(chat_id=another_user, text=message.text, entities=message.entities,

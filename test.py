@@ -1,11 +1,18 @@
 from data.loader import db
 
+db.remove_premium(434874523)
+
 # import psycopg2
 #
-# host = 'localhost'
-# user = 'postgres'
-# password = 'root'
-# db_name = 'bot-misha'
+# host = '83.69.139.168'
+# user = 'anonimch_pg-user'
+# password = '=Bd2WhnFbzbl'
+# db_name = 'anonimch_bot-misha'
+#
+# # host = 'localhost'
+# # user = 'postgres'
+# # password = 'root'
+# # db_name = 'bot-misha'
 #
 # class DataBase:
 #     def __init__(self):
@@ -35,7 +42,7 @@ from data.loader import db
 #         sql = '''
 #             SELECT * FROM users
 #         '''
-#         return self.manager(sql, fetchone=True)
+#         return self.manager(sql, fetchall=True)
 #
 # print(DataBase().test())
 
@@ -63,5 +70,5 @@ from data.loader import db
 # db.add_premium(434874523, 1701281552, 1701281552+120)
 
 
-db.remove_user(434874523)
-db.remove_user_stats(434874523)
+# db.remove_user(434874523)
+# db.remove_user_stats(434874523)

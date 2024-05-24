@@ -264,6 +264,12 @@ class DataBase:
         '''
         return self.manager(sql, telegram_id, fetchone=True)
 
+    def change_premium(self, telegram_id, date):
+        sql = '''
+            UPDATE premium SET to_date = %s WHERE telegram_id = %s
+        '''
+        self.manager(sql, date, telegram_id, commit=True)
+
     def get_overdue_premium(self, telegram_id, time):
         sql = '''
             SELECT * FROM premium WHERE telegram_id = %s AND to_date < %s
@@ -524,32 +530,6 @@ class DataBase:
 
 
 
-    def create_test(self):
-        sql = '''
-            CREATE TABLE IF NOT EXISTS test(
-                telegram_id BIGINT PRIMARY KEY,
-                what SMALLINT 
-            )
-        '''
-        self.manager(sql, commit=True)
-
-    def drop_test(self):
-        sql = '''
-            DROP TABLE IF EXISTS test
-        '''
-        self.manager(sql, commit=True)
-
-    def add_test(self, telegram_id, what):
-        sql = '''
-            INSERT INTO test VALUES(%s,%s)
-        '''
-        self.manager(sql, telegram_id, what, commit=True)
-
-    def get_test(self, telegram_id):
-        sql = '''
-            SELECT * FROM test WHERE telegram_id = %s
-        '''
-        return self.manager(sql, telegram_id, fetchone=True)
 
 
 

@@ -14,11 +14,11 @@ from states.states import states
 from keyboards.reply import reply_keyboard
 from keyboards.inline import inline_keyboard
 from data.translate import get_translate
-from data.config import show_time, check_time
+from data.functions import show_time, check_time
 from filters.filters import IsAdmin, CommandStartFilter
 
-from handlers.users.text_handlers import working, show_main_menu
-from asyncdef.auto_searching import auto_searching
+from handlers.users.text_handlers import show_main_menu
+
 
 import datetime
 
@@ -221,9 +221,6 @@ async def command_unban(message: Message, state: FSMContext, command: CommandObj
 
 @dp.message(Command('start'), CommandStartFilter())
 async def command_start(message: Message, state: FSMContext):
-    if working[0] == False:
-        working[0] = True
-        await auto_searching()
     if db.get_user(message.chat.id):
         await show_main_menu(message, state)
     else:
